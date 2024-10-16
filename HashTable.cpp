@@ -1,135 +1,92 @@
 #include <vector>
-#include <cmath>
 #include <iostream>
+using namespace std;
 
 class HashTable {
 private:
-    std::vector<int> table;  // The storage for the hash table
-    int size;                // Current size of the hash table
-    int count;               // Count of elements in the hash table
-    double loadFactorThreshold;  // Load factor threshold for resizing
+    vector<int> keys;
+    vector<int> values;
+    vector<bool> occupied;
+    int capacity;
+    int numElements;
 
-    // Hash function to compute the index
-    int hash(int key) const {
-        return key % size;
+    int hash(int key) {
+        return key % capacity;
     }
 
-    // Helper function to find the next prime number greater than or equal to `n`
-    int nextPrime(int n) const {
-        while (true) {
-            bool isPrime = true;
-            for (int i = 2; i <= std::sqrt(n); i++) {
-                if (n % i == 0) {
-                    isPrime = false;
-                    break;
-                }
-            }
-            if (isPrime) return n; // Return if prime
-            n++; // Check next number
-        }
-    }
-
-    // Function to resize and rehash the hash table
     void resize() {
-        int newSize = nextPrime(size * 2);
-        std::vector<int> newTable(newSize, -1); // Create new table
-        
-        for (int i = 0; i < size; i++) {
-            if (table[i] != -1 && table[i] != -2) { // -2 indicates a deleted slot
-                int key = table[i];
-                int index = key % newSize;
-                int j = 0;
-                while (newTable[(index + j * j) % newSize] != -1) {
-                    j++;
-                }
-                newTable[(index + j * j) % newSize] = key; // Insert into new table
+        int oldCapacity = capacity;
+        capacity *= 2; // Double the size
+        vector<int> oldKeys = keys;
+        vector<int> oldValues = values;
+        keys.resize(capacity);
+        values.resize(capacity);
+        fill(occupied.begin(), occupied.end(), false);
+        numElements = 0;
+        for (int i = 0; i < oldCapacity; i++) {
+            if (occupied[i]) {
+                insert(oldKeys[i], oldValues[i]);
             }
         }
-        table = newTable; // Update table to new table
-        size = newSize;   // Update size
     }
 
 public:
-    // Constructor
-    HashTable(int initSize = 5) {
-        size = nextPrime(initSize); // Set size to next prime
-        table.resize(size, -1);     // Initialize table with -1
-        count = 0;                   // Initialize count
-        loadFactorThreshold = 0.8;   // Set load factor threshold
+    HashTable(int initialSize) : capacity(initialSize), numElements(0) {
+        keys.resize(capacity);
+        values.resize(capacity);
+        occupied.resize(capacity, false);
     }
 
-    // Insert a key into the hash table
-    void insert(int key) {
-        if (count >= loadFactorThreshold * size) {
-            resize(); // Resize if load factor exceeded
+    void insert(int key, int value) {
+        if (float(numElements) / capacity >= 0.8) {
+            resize();
         }
         int index = hash(key);
-        int j = 0;
-
-        while (j < size) {
-            int probeIndex = (index + (j * j)) % size;
-            if (table[probeIndex] == key) {
-                std::cout << "Duplicate key insertion is not allowed\n";
-                return; // Duplicate found
-            }
-            if (table[probeIndex] == -1 || table[probeIndex] == -2) {
-                table[probeIndex] = key; // Insert key
-                count++;
-                return; // Key inserted
-            }
-            j++;
+        int i = 0;
+        while (occupied[index]) {
+            index = (hash(key) + i * i) % capacity;
+            i++;
         }
-        std::cout << "Max probing limit reached!\n";
+        keys[index] = key;
+        values[index] = value;
+        occupied[index] = true;
+        numElements++;
     }
 
-    // Remove a key from the hash table
+    int search(int key) {
+        int index = hash(key);
+        int i = 0;
+        while (occupied[index]) {
+            if (keys[index] == key) {
+                return values[index];
+            }
+            index = (hash(key) + i * i) % capacity;
+            i++;
+        }
+        return -1; // Key not found
+    }
+
     void remove(int key) {
         int index = hash(key);
-        int j = 0;
-
-        while (j < size) {
-            int probeIndex = (index + (j * j)) % size;
-            if (table[probeIndex] == key) {
-                table[probeIndex] = -2; // Mark as deleted
-                count--;
-                return; // Key removed
-            } else if (table[probeIndex] == -1) {
-                std::cout << "Element not found\n";
-                return; // Element not found
+        int i = 0;
+        while (occupied[index]) {
+            if (keys[index] == key) {
+                occupied[index] = false;
+                numElements--;
+                return;
             }
-            j++;
+            index = (hash(key) + i * i) % capacity;
+            i++;
         }
-        std::cout << "Element not found\n";
-    }
-
-    // Search for a key in the hash table
-    int search(int key) const {
-        int index = hash(key);
-        int j = 0;
-
-        while (j < size) {
-            int probeIndex = (index + (j * j)) % size;
-            if (table[probeIndex] == key) {
-                return probeIndex; // Return found index
-            } else if (table[probeIndex] == -1) {
-                return -1; // Not found
-            }
-            j++;
-        }
-        return -1; // Not found
-    }
-
-    // Print the contents of the hash table
-    void printTable() const {
-        for (int i = 0; i < size; i++) {
-            if (table[i] == -1) {
-                std::cout << "- "; // Empty slot
-            } else if (table[i] == -2) {
-                std::cout << "- "; // Deleted slot
-            } else {
-                std::cout << table[i] << " "; // Print key
-            }
-        }
-        std::cout << "\n";
     }
 };
+
+int main() {
+    HashTable ht(10);
+    ht.insert(1, 100);
+    ht.insert(2, 200);
+    cout << "Search for key 1: " << ht.search(1) << endl;
+    ht.remove(1);
+    cout << "Search for key 1 after deletion: " << ht.search(1) << endl;
+    return 0;
+}
