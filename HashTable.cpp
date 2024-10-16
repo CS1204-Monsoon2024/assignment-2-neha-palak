@@ -1,147 +1,135 @@
-#include <iostream>
 #include <vector>
 #include <cmath>
-using namespace std;
+#include <iostream>
 
 class HashTable {
-    public:
-        double load_fact = 0.8;
-        int m;
-        int size = 0;
-        std::vector<int> table;
+private:
+    std::vector<int> table;
+    int size;
+    int count;
+    double loadFactorThreshold;
 
-        HashTable(int initialSize) {
-            m = initialSize;
-            table.resize(m, -1); 
-        }
+    // Hash function
+    int hash(int key) {
+        return key % size;
+    }
 
-        void insert(int value){
-            checkIfResize();
-            int key = quadratic_probe(value);
-            if(key == -1){
-                cout << "Max probing limit reached!" << endl;
-                return;
-            } else if(key == -2){
-                cout << "Duplicate key insertion is not allowed" << endl;
-                return;
-            }
-
-            table[key] = value;
-            size ++;
-        }
-
-        void remove(int value){
-            int key = quadratic_probe_search(value);
-            if(key == -1){
-                cout << "Element not found" << endl;
-                return;
-            }
-            table[key] = -1;
-            size --;
-        }
-
-        int search(int value){
-            return quadratic_probe_search(value);
-        }
-
-        void printTable(){
-            for(auto itr : table){
-                if(itr == -1){
-                    cout << "-" << " ";
-                }else{
-                    cout << itr << " ";
-                }
-            }
-            cout << '\n';
-            return;
-        }
-
-    private:
-        void checkIfResize(){
-            if((double)size / (double)m > load_fact) {
-                m = getNewSize();
-                std::vector<int> new_table(m, -1);
-                table.swap(new_table);
-                size = 0;
-                for(auto itr: new_table){
-                    if(itr == -1){
-                        continue;
-                    }
-                    else{
-                        insert(itr);
-                    }
-                }
-                // Deallocate memory
-                new_table = std::vector<int>();
-            }
-        }
-
-        int getNewSize(){
-            int new_size = m * 2 + 1;
-            while(!isPrime(new_size)){
-                new_size ++;
-            }
-            return new_size;
-        }
-
-        bool isPrime(int n){
-            int i;
-            double sqrt_n = sqrt(n) ;
-            for (i = 2; i <= sqrt_n ; i++)
-            {
-                if (n % i == 0){
-                    return false;
+    // Find the next prime number greater than or equal to `n`
+    int nextPrime(int n) {
+        while (true) {
+            bool isPrime = true;
+            for (int i = 2; i <= std::sqrt(n); i++) {
+                if (n % i == 0) {
+                    isPrime = false;
                     break;
                 }
             }
-            return true;
-
+            if (isPrime) return n;
+            n++;
         }
+    }
 
-        int hash(int value){
-            return value % m;
-        }
+    // Resize and rehash the hash table
+    void resize() {
+        int newSize = nextPrime(size * 2);
+        std::vector<int> newTable(newSize, -1);
         
-        int quadratic_probe(int value){
-            int max = (m + 1) / 2;
-            int key;
-            bool found = false;
-
-            for(int step=0; step <= max; step++){
-                key = (hash(value) + step*step) % m;
-                if(table[key] == -1){
-                    found = true;
-                    break;
-                } else if(table[key] == value){
-                    return -2;
+        for (int i = 0; i < size; i++) {
+            if (table[i] != -1 && table[i] != -2) {  // -2 represents a deleted slot
+                int key = table[i];
+                int index = key % newSize;
+                int j = 0;
+                while (newTable[(index + j * j) % newSize] != -1) {
+                    j++;
                 }
-
+                newTable[(index + j * j) % newSize] = key;
             }
-            
-            if(found == false){
+        }
+        table = newTable;
+        size = newSize;
+    }
+
+public:
+    // Constructor
+    HashTable(int initSize = 5) {
+        size = nextPrime(initSize);
+        table = std::vector<int>(size, -1); // -1 represents an empty slot
+        count = 0;
+        loadFactorThreshold = 0.8;
+    }
+
+    // Insert a key
+    void insert(int key) {
+        if (count >= loadFactorThreshold * size) {
+            resize();
+        }
+        int index = hash(key);
+        int j = 0;
+
+        while (j < size) {
+            int probeIndex = (index + (j * j)) % size;
+            if (table[probeIndex] == key) {
+                std::cout << "Duplicate key insertion is not allowed\n";
+                return;
+            }
+            if (table[probeIndex] == -1 || table[probeIndex] == -2) {
+                table[probeIndex] = key;
+                count++;
+                return;
+            }
+            j++;
+        }
+        std::cout << "Max probing limit reached!\n";
+    }
+
+    // Remove a key
+    void remove(int key) {
+        int index = hash(key);
+        int j = 0;
+
+        while (j < size) {
+            int probeIndex = (index + (j * j)) % size;
+            if (table[probeIndex] == key) {
+                table[probeIndex] = -2; // -2 represents a deleted slot
+                count--;
+                return;
+            } else if (table[probeIndex] == -1) {
+                std::cout << "Element not found\n";
+                return;
+            }
+            j++;
+        }
+        std::cout << "Element not found\n";
+    }
+
+    // Search for a key and return its index, or -1 if not found
+    int search(int key) {
+        int index = hash(key);
+        int j = 0;
+
+        while (j < size) {
+            int probeIndex = (index + (j * j)) % size;
+            if (table[probeIndex] == key) {
+                return probeIndex;
+            } else if (table[probeIndex] == -1) {
                 return -1;
             }
-            else{
-                return key;
+            j++;
+        }
+        return -1;
+    }
+
+    // Print the hash table
+    void printTable() {
+        for (int i = 0; i < size; i++) {
+            if (table[i] == -1) {
+                std::cout << "- ";
+            } else if (table[i] == -2) {
+                std::cout << "- ";
+            } else {
+                std::cout << table[i] << " ";
             }
         }
-
-        int quadratic_probe_search(int value){
-            int max = (m + 1) / 2;
-            int key;
-
-            for(int step = 0; step <= max; step++){
-                key = (hash(value) + step*step) % m;
-                if(table[key] == -1){
-                    return -1;
-
-                }else if (table[key] == value){
-                    return key;
-                }
-                
-
-            }
-
-            return -1;
-        }
+        std::cout << "\n";
+    }
 };
